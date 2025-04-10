@@ -1,116 +1,316 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>ARC Testing Interface</title>
-    <link rel="stylesheet" type="text/css" href="css/common.css">
-    <link rel="stylesheet" type="text/css" href="css/testing_interface.css">
-    <link href="https://fonts.googleapis.com/css?family=Open+Sans&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARC LLM Solver</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono&display=swap">
+    <link rel="stylesheet" href="css/common.css">
+    <link rel="stylesheet" href="css/testing_interface.css">
+    <link rel="stylesheet" href="css/styles.css">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   </head>
   <body>
+    <!-- Welcome Modal -->
     <div id="modal_bg">
       <div id="modal">
-          <div>Welcome to the ARC testing interface.<br>
-              Choose a task file to start, or click on "Random task" to load one from the ARC project on GitHub.
+          <div>
+            <i class="fas fa-robot fa-3x" style="color: #3a7bd5; margin-bottom: 1rem;"></i>
+            <h2>Welcome to the ARC LLM Solver</h2>
+            <p>Solve Abstraction and Reasoning Corpus challenges with the power of AI</p>
           </div>
-          <br>
-          <input type="file" class="load_task"/>
-          <button onclick="randomTask()" id="random_task_btn">Random task</button>
+          <div class="btn-group" style="justify-content: center;">
+            <input type="file" id="initial_load_task" class="load_task" style="display: none;"/>
+            <button class="btn btn-primary" onclick="document.getElementById('initial_load_task').click();">
+              <i class="fas fa-file-import"></i> Load Task
+            </button>
+            <button class="btn btn-secondary" onclick="randomTask()" id="random_task_btn">
+              <i class="fas fa-random"></i> Random Task
+            </button>
+          </div>
       </div>
     </div>
-    <button onclick="askGPTForSolution()">Ask GPT-4o to Solve</button>
-    <div id="gpt_solution_box" style="margin-top:10px; background: #f9f9f9; padding: 10px; border: 1px solid #ccc;">
-      <b>GPT-4o Output:</b>
-      <pre id="gpt_output_text">(no output yet)</pre>
-      <div id="gpt_output_result"></div>
-    </div>
-    <div id="workspace">
-      <div id="demonstration_examples_view">
-          <div class="text" id="task_demo_header">Task demonstration</div>
+
+    <!-- Header -->
+    <header class="app-header">
+      <div class="container">
+        <h1 class="app-title">
+          <i class="fas fa-brain"></i> ARC LLM Solver
+          <span>Powered by AI</span>
+        </h1>
+      </div>
+    </header>
+
+    <div class="container">
+      <!-- Control Panel -->
+      <div class="control-panel">
+        <h2 class="panel-heading">
+          Control Panel
+          <div id="task_name">Task name: No task loaded</div>
+        </h2>
+        
+        <div class="task-control">
+          <label for="load_task_file_input">Load task: </label>
+          <input type="file" id="load_task_file_input" class="load_task" style="display: none;"/>
+          <button class="btn btn-secondary" onclick="document.getElementById('load_task_file_input').click();">
+            <i class="fas fa-file-upload"></i> Browse...
+          </button>
+          <button class="btn btn-secondary" onclick="randomTask()" id="random_task_btn">
+            <i class="fas fa-dice"></i> Random Task
+          </button>
+          
+          <div style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem;">
+            <label for="show_symbol_numbers">
+              <i class="fas fa-hashtag"></i> Show Numbers:
+            </label>
+            <input type="checkbox" id="show_symbol_numbers" name="show_symbol_numbers" onchange="changeSymbolVisibility()">
+          </div>
+        </div>
+        
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="askLLMForSolution()">
+            <i class="fas fa-magic"></i> Solve Current Task with LLM
+          </button>
+          <button class="btn btn-secondary" onclick="startBatchProcessing(5)">
+            <i class="fas fa-tasks"></i> Process 5 Tasks
+          </button>
+          <button class="btn btn-secondary" onclick="startBatchProcessing(20)">
+            <i class="fas fa-layer-group"></i> Process 20 Tasks
+          </button>
+          <button class="btn btn-secondary" onclick="downloadCurrentResults()">
+            <i class="fas fa-download"></i> Download Results
+          </button>
+        </div>
+        
+        <div class="stats-box">
+          <div class="stat-item">
+            <strong><i class="fas fa-keyboard"></i> Test Input</strong>
+            <div><span id="current_test_input_id_display">0</span>/<span id="total_test_input_count_display">0</span></div>
+            <button class="btn btn-secondary" onclick="nextTestInput()">
+              <i class="fas fa-step-forward"></i> Next Test
+            </button>
+          </div>
+          <div class="stat-item">
+            <strong><i class="fas fa-check-circle"></i> Solution Status</strong>
+            <div id="solution_status">No solution yet</div>
+          </div>
+          <div class="stat-item">
+            <strong><i class="fas fa-chart-bar"></i> Batch Progress</strong>
+            <div id="batch_progress">Not running</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Results Panel -->
+      <div class="result-panel" id="gpt_solution_box">
+        <h3><i class="fas fa-robot"></i> LLM Output</h3>
+        <pre id="gpt_output_text">(no output yet)</pre>
+        <div id="gpt_output_result"></div>
+      </div>
+      
+      <!-- Workspace -->
+      <div id="workspace">
+        <div id="demonstration_examples_view">
+          <div class="text" id="task_demo_header">
+            <i class="fas fa-lightbulb"></i> Task Demonstration
+          </div>
           <div id="task_preview"></div>
-      </div>
-      <div id="evaluation_view">
+        </div>
+        
+        <div id="evaluation_view">
           <div id="evaluation-input-view">
-              <div class="text">
-                Test input grid <span id="current_test_input_id_display">0</span>/<span id="total_test_input_count_display">0</span>
-                <button onclick="nextTestInput()">Next test input</button>
-              </div>
-              <div id="evaluation_input" class="selectable_grid"></div>
+            <div class="text">
+              <i class="fas fa-input"></i> Test Input Grid
+              <button class="btn btn-secondary" onclick="nextTestInput()">
+                <i class="fas fa-forward"></i> Next
+              </button>
+            </div>
+            <div id="evaluation_input" class="selectable_grid"></div>
           </div>
+          
           <div id="evaluation_output_editor">
-              <div id="load_task_control_btns">
-                  <label for="load_task_file_input">Load task JSON: </label>
-                  <input type="file" id="load_task_file_input" class="load_task" style="display: none;"/>
-                  <input type="button" value="Browse..." onclick="document.getElementById('load_task_file_input').click();" />
-                  <button onclick="randomTask()" id="random_task_btn"> Random... </button>
-                  <p>
-                  <label id="task_name" for="random_task_btn"> Task name: </label>
-                  <p>
-                  <label for="show_symbol_numbers">Show symbol numbers: </label>
-                  <input type="checkbox" id="show_symbol_numbers" name="show_symbol_numbers" onchange="changeSymbolVisibility()">
+            <div id="edition_view">
+              <div id="editor_grid_control_btns">
+                <div id="resize_control_btns">
+                  <label for="output_grid_size">Grid size: </label>
+                  <input type="text" id="output_grid_size" class="grid_size_field" name="size" value="3x3">
+                  <button class="btn btn-secondary" onclick="resizeOutputGrid()" id="resize_btn">
+                    <i class="fas fa-expand"></i> Resize
+                  </button>
+                </div>
+                <button class="btn btn-secondary" onclick="copyFromInput()">
+                  <i class="fas fa-copy"></i> Copy from Input
+                </button>
+                <button class="btn btn-secondary" onclick="resetOutputGrid()">
+                  <i class="fas fa-redo"></i> Reset
+                </button>
+                <button class="btn btn-success" onclick="submitSolution()" id="submit_solution_btn">
+                  <i class="fas fa-check"></i> Submit
+                </button>
               </div>
-              <div id="edition_view">
-                  <div id="editor_grid_control_btns">
-                      <div id="resize_control_btns">
-                          <label for="output_grid_size">Change grid size: </label>
-                          <input type="text" id="output_grid_size" class="grid_size_field" name="size" value="3x3">
-                          <button onclick="resizeOutputGrid()" id="resize_btn">Resize</button>
-                      </div>
-                      <button onclick="copyFromInput()">Copy from input</button>
-                      <button onclick="resetOutputGrid()">Reset grid</button>
-                      <button onclick="submitSolution()" id="submit_solution_btn">Submit!</button>
-                  </div>
-                  <div id="output_grid">
-                      <div class="edition_grid selectable_grid">
-                          <div class="row">
-                              <div class="cell" symbol="0" x="0" y="0"></div>
-                              <div class="cell" symbol="0" x="0" y="1"></div>
-                              <div class="cell" symbol="0" x="0" y="2"></div>
-                          </div>
-                          <div class="row">
-                              <div class="cell" symbol="0" x="1" y="0"></div>
-                              <div class="cell" symbol="0" x="1" y="1"></div>
-                              <div class="cell" symbol="0" x="1" y="2"></div>
-                          </div>
-                          <div class="row">
-                              <div class="cell" symbol="0" x="2" y="0"></div>
-                              <div class="cell" symbol="0" x="2" y="1"></div>
-                              <div class="cell" symbol="0" x="2" y="2"></div>
-                          </div>
-                      </div>
-                  </div>
-                  <div id="toolbar">
-                      <div>
-                          <input type="radio" id="tool_edit" name="tool_switching" value="edit" checked>
-                          <label for="tool_edit">Edit</label>
-                          <input type="radio" id="tool_select" name="tool_switching" value="select">
-                          <label for="tool_select">Select</label>
-                          <input type="radio" id="tool_floodfill" name="tool_switching" value="floodfill">
-                          <label for="tool_floodfill">Flood fill</label>
-                      </div>
-                  </div>
-                  <div id="symbol_picker">
-                      <div class="symbol_preview symbol_0 selected-symbol-preview" symbol="0"></div>
-                      <div class="symbol_preview symbol_1" symbol="1"></div>
-                      <div class="symbol_preview symbol_2" symbol="2"></div>
-                      <div class="symbol_preview symbol_3" symbol="3"></div>
-                      <div class="symbol_preview symbol_4" symbol="4"></div>
-                      <div class="symbol_preview symbol_5" symbol="5"></div>
-                      <div class="symbol_preview symbol_6" symbol="6"></div>
-                      <div class="symbol_preview symbol_7" symbol="7"></div>
-                      <div class="symbol_preview symbol_8" symbol="8"></div>
-                      <div class="symbol_preview symbol_9" symbol="9"></div>
-                  </div>
+              
+              <div id="output_grid">
+                <div class="edition_grid selectable_grid">
+                  <!-- Grid cells will be dynamically added -->
+                </div>
               </div>
-              <div id="error_display"></div>
-              <div id="info_display"></div>
+              
+              <div id="toolbar">
+                <div>
+                  <input type="radio" id="tool_edit" name="tool_switching" value="edit" checked>
+                  <label for="tool_edit"><i class="fas fa-edit"></i> Edit</label>
+                  
+                  <input type="radio" id="tool_select" name="tool_switching" value="select">
+                  <label for="tool_select"><i class="fas fa-object-group"></i> Select</label>
+                  
+                  <input type="radio" id="tool_floodfill" name="tool_switching" value="floodfill">
+                  <label for="tool_floodfill"><i class="fas fa-fill-drip"></i> Flood Fill</label>
+                </div>
+              </div>
+              
+              <div id="symbol_picker">
+                <div class="symbol_preview symbol_0 selected-symbol-preview" symbol="0" data-value="0"></div>
+                <div class="symbol_preview symbol_1" symbol="1" data-value="1"></div>
+                <div class="symbol_preview symbol_2" symbol="2" data-value="2"></div>
+                <div class="symbol_preview symbol_3" symbol="3" data-value="3"></div>
+                <div class="symbol_preview symbol_4" symbol="4" data-value="4"></div>
+                <div class="symbol_preview symbol_5" symbol="5" data-value="5"></div>
+                <div class="symbol_preview symbol_6" symbol="6" data-value="6"></div>
+                <div class="symbol_preview symbol_7" symbol="7" data-value="7"></div>
+                <div class="symbol_preview symbol_8" symbol="8" data-value="8"></div>
+                <div class="symbol_preview symbol_9" symbol="9" data-value="9"></div>
+              </div>
+            </div>
+            
+            <div id="error_display"></div>
+            <div id="info_display"></div>
           </div>
+        </div>
       </div>
+      
+      <!-- Footer -->
+      <footer style="text-align: center; margin-top: 2rem; padding: 1rem; color: var(--gray-color); border-top: 1px solid var(--gray-light);">
+        <p>ARC LLM Solver &copy; 2025 | Abstraction and Reasoning Corpus by François Chollet</p>
+      </footer>
     </div>
+
+    <!-- Scripts -->
     <script src="js/common.js"></script>
     <script src="js/testing_interface.js"></script>
     <script src="js/openai_api.js"></script>
-  </body>
-</html>
+    <script src="js/arc_llm_solver.js"></script>
+    <script>
+      // Additional UI enhancements
+      $(document).ready(function() {
+        // Initialize the solution status display
+        $('#solution_status').html('<span style="color: var(--gray-color);"><i class="fas fa-hourglass"></i> Waiting for task</span>');
+        
+        // Show symbol values in the picker when hovering
+        $('.symbol_preview').each(function() {
+          let value = $(this).attr('symbol');
+          $(this).hover(
+            function() { $(this).text(value); },
+            function() { $(this).text(''); }
+          );
+        });
+        
+        // Add tooltips to buttons
+        $('.btn').each(function() {
+          let text = $(this).text().trim();
+          if (text) {
+            $(this).attr('title', text);
+          }
+        });
+        
+        // Enhanced error and info messages
+        window.errorMsg = function(msg) {
+          $('#error_display').stop(true, true);
+          $('#info_display').stop(true, true);
+          $('#error_display').hide();
+          $('#info_display').hide();
+          $('#error_display').html('<i class="fas fa-exclamation-circle"></i> ' + msg);
+          $('#error_display').show();
+          $('#error_display').addClass('fade-in');
+          $('#error_display').fadeOut(5000);
+        };
+        
+        window.infoMsg = function(msg) {
+          $('#error_display').stop(true, true);
+          $('#info_display').stop(true, true);
+          $('#info_display').hide();
+          $('#error_display').hide();
+          $('#info_display').html('<i class="fas fa-info-circle"></i> ' + msg);
+          $('#info_display').show();
+          $('#info_display').addClass('fade-in');
+          $('#info_display').fadeOut(5000);
+        };
+        
+        // Update the original askLLMForSolution function to update status
+        const originalAskLLM = window.askLLMForSolution;
+        window.askLLMForSolution = async function() {
+          $('#solution_status').html('<span style="color: var(--primary-color);"><i class="fas fa-spinner fa-spin"></i> Processing...</span>');
+          await originalAskLLM();
+          // The status will be updated by the solver
+        };
+        
+        // Enhance the original submitSolution function
+        const originalSubmit = window.submitSolution;
+        window.submitSolution = function() {
+          originalSubmit();
+          // Update status based on info/error display visibility
+          setTimeout(() => {
+            if ($('#info_display').is(':visible')) {
+              $('#solution_status').html('<span style="color: var(--success-color);"><i class="fas fa-check-circle"></i> Correct!</span>');
+            } else if ($('#error_display').is(':visible')) {
+              $('#solution_status').html('<span style="color: var(--danger-color);"><i class="fas fa-times-circle"></i> Incorrect</span>');
+            }
+          }, 100);
+        };
+      });
+      
+      // Override arcSolver.solveCurrentTask to update status
+      document.addEventListener('DOMContentLoaded', function() {
+        // This will run after arc_llm_solver.js is loaded
+        setTimeout(() => {
+          if (typeof arcSolver !== 'undefined') {
+            const originalSolve = arcSolver.solveCurrentTask;
+            arcSolver.solveCurrentTask = async function() {
+              const result = await originalSolve.call(arcSolver);
+              if (result) {
+                $('#solution_status').html('<span style="color: var(--success-color);"><i class="fas fa-check-circle"></i> Correct!</span>');
+              } else {
+                $('#solution_status').html('<span style="color: var(--danger-color);"><i class="fas fa-times-circle"></i> Incorrect</span>');
+              }
+              return result;
+            };
+            
+            // Override batch processing functions
+            const originalProcess = arcSolver.processNextInQueue;
+            arcSolver.processNextInQueue = async function() {
+              if (this.currentTaskIndex >= this.totalTasks) {
+                $('#batch_progress').html('<span style="color: var(--success-color);"><i class="fas fa-check-circle"></i> Complete!</span>');
+                // Call the original function
+                await originalProcess.call(arcSolver);
+                return;
+              }
+              
+              // Update progress
+              $('#batch_progress').html(
+                `<span style="color: var(--primary-color);"><i class="fas fa-spinner fa-spin"></i> ${this.currentTaskIndex + 1}/${this.totalTasks}</span>`
+              );
+              
+              // Call the original function
+              await originalProcess.call(arcSolver);
+            };
+            
+            // Override startBatchProcessing
+            const originalBatch = arcSolver.startBatchProcessing;
+            arcSolver.startBatchProcessing = async function(taskUrls) {
+              $('#batch_progress').html('<span style="color: var(--primary-color);"><i class="fas fa-spinner fa-spin"></i> Starting...</span>');
+              await originalBatch.call(arcSolver, taskUrls);
+            };
+          }
+        }, 100);
+      });
